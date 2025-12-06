@@ -1,11 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Pro Chat App</title>
 <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-
 <style>
 /* ===== GLOBAL THEME ===== */
 body {
@@ -115,6 +114,15 @@ body {
     animation: msgPop 0.25s ease-out;
 }
 
+/* small meta text for status (keeps design subtle) */
+.msg-meta {
+    display: block;
+    font-size: 12px;
+    opacity: 0.85;
+    margin-top: 6px;
+    font-style: italic;
+}
+
 /* SENDER BAR */
 .sender {
     position: fixed;
@@ -164,7 +172,6 @@ body {
     from { box-shadow: 0 0 10px #00ffaa; }
     to { box-shadow: 0 0 25px #00eaff; }
 }
-
 </style>
 </head>
 <body>
@@ -182,7 +189,7 @@ body {
         action="https://script.google.com/macros/s/AKfycbxh1sI4XBNWcEi4y9kDyftiWoG9FOTg9bvWngFTOxYWKRI_xshd2H6jzzG3b-0IuRCu/exec"
         method="post">
 
-            <input id="maininput" placeholder="Type a message..." name="textmess">
+            <input id="maininput" placeholder="Type a message..." name="textmess" autocomplete="off">
             <input id="myinput" type="hidden" name="namm">
 
             <button id="mainsend" type="submit">
@@ -195,12 +202,26 @@ body {
 </div>
 
 <script>
-/* NAME HANDLING */
-let username = localStorage.getItem("usernamesA");
+/* ---------------------------
+   CONFIG & STATE
+   --------------------------- */
+const API_BASE = "https://script.google.com/macros/s/AKfycbxh1sI4XBNWcEi4y9kDyftiWoG9FOTg9bvWngFTOxYWKRI_xshd2H6jzzG3b-0IuRCu/exec";
+let username = localStorage.getItem("usernamesA") || null;
+let chatMessages = []; // in-memory only
+let lastRow = 0;
+let pollIntervalMs = 3000;
+let pollTimer = null;
+let consecutivePollErrors = 0;
+const MAX_BACKOFF_MS = 30000; // max backoff
+const chatbox = document.getElementById("chatbox");
+const maininput = document.getElementById("maininput");
+const mainsend = document.getElementById("mainsend");
 
+/* ---------------------------
+   NAME PROMPT (unchanged)
+   --------------------------- */
 function askName() {
     if (username) return;
-
     let name = "";
     while (true) {
         name = prompt("Enter your chat name (Max 10 characters):");
@@ -208,97 +229,276 @@ function askName() {
         if (name.length > 10) { alert("Too long (max 10 chars)"); continue; }
         break;
     }
-
     username = name;
     localStorage.setItem("usernamesA", username);
 }
 askName();
-
 document.getElementById("usernameDisplay").textContent = username;
 document.getElementById("myinput").value = username;
 
-/* LOAD LOCAL CHAT */
-const chatbox = document.getElementById("chatbox");
-let chatMessages = JSON.parse(localStorage.getItem("chatMessages") || "[]");
-
+/* ---------------------------
+   RENDERING
+   --------------------------- */
 function renderMessages() {
+    // clear and re-render (simple)
     chatbox.innerHTML = "";
     chatMessages.forEach(msg => {
         const div = document.createElement("div");
-        div.classList.add(msg.type);
-        div.innerHTML = msg.content;
+        div.classList.add(msg.type || "incoming");
+        // keep message content exactly as you had it, but add a small meta span for status if needed
+        // msg.content is assumed safe text coming from your API; if HTML is needed, retain as before
+        div.innerHTML = sanitize(msg.content);
+        if (msg.meta) {
+            const meta = document.createElement("span");
+            meta.className = "msg-meta";
+            meta.textContent = msg.meta;
+            div.appendChild(meta);
+        }
+        // attach retry handler for failed outgoing
+        if (msg._id && msg.type === "outgoing" && msg.status === "failed") {
+            const retry = document.createElement("button");
+            retry.textContent = "Retry";
+            retry.style.marginLeft = "8px";
+            retry.style.padding = "4px 8px";
+            retry.style.borderRadius = "6px";
+            retry.style.border = "none";
+            retry.style.cursor = "pointer";
+            retry.addEventListener("click", () => retrySend(msg._id));
+            div.appendChild(retry);
+        }
         chatbox.appendChild(div);
     });
     chatbox.scrollTop = chatbox.scrollHeight;
 }
-renderMessages();
 
-/* AUTO FETCH */
-let lastroww = 1;
-setInterval(() => {
-    fetch("https://script.google.com/macros/s/AKfycbxh1sI4XBNWcEi4y9kDyftiWoG9FOTg9bvWngFTOxYWKRI_xshd2H6jzzG3b-0IuRCu/exec?after=" + lastroww)
-    .then(res => res.json())
-    .then(api => {
-        const data = api.data;
+// minimal sanitizer (keeps plain text behavior like before)
+function sanitize(input) {
+    // if you intentionally want HTML in messages, remove this and be careful
+    const d = document.createElement("div");
+    d.textContent = input;
+    return d.innerHTML;
+}
+
+/* ---------------------------
+   DEDUPLICATION HELPERS
+   --------------------------- */
+function findMessageIndexByContent(content) {
+    return chatMessages.findIndex(m => m.content === content);
+}
+
+function messageExistsOnClient(content) {
+    return chatMessages.some(m => m.content === content);
+}
+
+/* ---------------------------
+   POLLING (server -> client)
+   --------------------------- */
+async function pollOnce() {
+    try {
+        const res = await fetch(API_BASE + "?after=" + lastRow, { cache: "no-store" });
+        if (!res.ok) throw new Error("Poll failed: " + res.status);
+        const api = await res.json();
+        const data = api.data || [];
         let changed = false;
-
         for (let U of data) {
-            const N = U["Names"];
-            const T = U["Messages "];
-            const msg = N + ": " + T;
-
-            if (!chatMessages.find(m => m.content === msg)) {
-                chatMessages.push({type: "incoming", content: msg});
+            const N = (U["Names"] || "").trim();
+            const T = (U["Messages "] || "").trim();
+            const msgText = N + ": " + T;
+            // dedupe using exact content; this keeps order stable even if optimistic outgoing existed
+            if (!messageExistsOnClient(msgText)) {
+                chatMessages.push({ type: "incoming", content: msgText });
                 changed = true;
+            } else {
+                // if the message was previously optimistic outgoing, mark it confirmed
+                const idx = chatMessages.findIndex(m => m.content === msgText && m.type === "outgoing" && m.status === "sending");
+                if (idx !== -1) {
+                    chatMessages[idx].status = "sent";
+                    // remove meta sending text
+                    delete chatMessages[idx].meta;
+                    changed = true;
+                }
             }
         }
+        // update lastRow from API
+        if (typeof api.last === "number" && api.last > lastRow) lastRow = api.last;
+        // rerender if changed
+        if (changed) renderMessages();
+        consecutivePollErrors = 0; // reset backoff on success
+    } catch (err) {
+        console.warn("Polling error:", err);
+        consecutivePollErrors++;
+        // increase interval with exponential backoff, capped
+        const backoff = Math.min(pollIntervalMs * Math.pow(1.8, consecutivePollErrors), MAX_BACKOFF_MS);
+        restartPollingWithInterval(backoff);
+    }
+}
 
-        lastroww = api.last;
+function startPolling() {
+    if (pollTimer) clearInterval(pollTimer);
+    pollTimer = setInterval(() => pollOnce(), pollIntervalMs);
+    // do an immediate fetch at start
+    pollOnce();
+}
 
-        if (changed) {
-            localStorage.setItem("chatMessages", JSON.stringify(chatMessages));
-            renderMessages();
-        }
-    })
-}, 5000);
+function restartPollingWithInterval(ms) {
+    if (pollTimer) clearInterval(pollTimer);
+    pollTimer = setInterval(() => pollOnce(), ms);
+}
 
-/* SEND MESSAGE */
-document.getElementById("aa").addEventListener("submit", function(e) {
+/* ---------------------------
+   SENDING (client -> server)
+   --------------------------- */
+let tempIdCounter = 0;
+
+async function sendMessageToServer(text) {
+    // build form data similar to the form submission
+    const form = new FormData();
+    form.append("textmess", text);
+    form.append("namm", username || "Anon");
+
+    // return promise that resolves on success or rejects
+    const res = await fetch(API_BASE, {
+        method: "POST",
+        body: form,
+        cache: "no-store"
+    });
+    if (!res.ok) throw new Error("Send failed: " + res.status);
+    // server may redirect or return HTML; we treat success as ok status
+    return res;
+}
+
+function addOutgoingOptimistic(text) {
+    const tempId = "temp-" + (++tempIdCounter);
+    const content = username + ": " + text;
+    const entry = {
+        _id: tempId,
+        type: "outgoing",
+        content: content,
+        status: "sending",
+        meta: "sending..."
+    };
+    chatMessages.push(entry);
+    renderMessages();
+    return entry;
+}
+
+async function retrySend(tempId) {
+    const idx = chatMessages.findIndex(m => m._id === tempId);
+    if (idx === -1) return;
+    const entry = chatMessages[idx];
+    entry.status = "sending";
+    entry.meta = "sending...";
+    renderMessages();
+    try {
+        await sendMessageToServer(extractPlainTextFromContent(entry.content));
+        // success: we'll get server confirmation on next poll; but mark as sent now to remove (failed)
+        entry.status = "sent";
+        delete entry.meta;
+        renderMessages();
+    } catch (err) {
+        console.warn("Retry failed", err);
+        entry.status = "failed";
+        entry.meta = "failed to deliver";
+        renderMessages();
+    }
+}
+
+function extractPlainTextFromContent(content) {
+    // content format: "username: message"
+    const idx = content.indexOf(":");
+    if (idx === -1) return content;
+    return content.slice(idx + 1).trim();
+}
+
+/* handle form submit */
+document.getElementById("aa").addEventListener("submit", async function(e) {
     e.preventDefault();
-
     const message = maininput.value.trim();
     if (!message) return;
-
-    const fullMsg = username + ": " + message;
-
-    chatMessages.push({type: "outgoing", content: fullMsg});
-    localStorage.setItem("chatMessages", JSON.stringify(chatMessages));
-
-    renderMessages();
-
-    this.submit();
-
+    // optimistic add
+    const optimistic = addOutgoingOptimistic(message);
+    // clear input & remove typing glow
     maininput.value = "";
     mainsend.classList.remove("typing-active");
+    try {
+        await sendMessageToServer(message);
+        // on success we don't immediately duplicate — the poll will confirm and remove 'sending...'
+        optimistic.status = "sent";
+        delete optimistic.meta; // remove sending label for good UX even if poll hasn't caught up
+        renderMessages();
+    } catch (err) {
+        console.warn("Send failed:", err);
+        optimistic.status = "failed";
+        optimistic.meta = "failed to deliver";
+        renderMessages();
+    }
 });
 
-/* GLOW WHEN TYPING */
+/* ---------------------------
+   UTIL: init load of history (server only)
+   --------------------------- */
+async function initialLoad() {
+    // fetch all messages after row 0
+    try {
+        const res = await fetch(API_BASE + "?after=0", { cache: "no-store" });
+        if (!res.ok) throw new Error("Initial load failed: " + res.status);
+        const api = await res.json();
+        const data = api.data || [];
+        chatMessages = []; // ensure fresh
+        for (let U of data) {
+            const N = (U["Names"] || "").trim();
+            const T = (U["Messages "] || "").trim();
+            const msgText = N + ": " + T;
+            // push as incoming (server is authoritative)
+            if (!messageExistsOnClient(msgText)) {
+                chatMessages.push({ type: "incoming", content: msgText });
+            }
+        }
+        if (typeof api.last === "number") lastRow = api.last;
+        renderMessages();
+    } catch (err) {
+        console.warn("Initial load error:", err);
+    }
+}
+
+/* ---------------------------
+   TYPING GLOW
+   --------------------------- */
 maininput.addEventListener("input", (e) => {
     if (e.target.value.trim().length > 0) mainsend.classList.add("typing-active");
     else mainsend.classList.remove("typing-active");
 });
 
-/* SEARCH FILTER */
+/* ---------------------------
+   SEARCH FILTER (keeps same behavior)
+   --------------------------- */
 document.getElementById("searchBar").addEventListener("input", function() {
     const text = this.value.toLowerCase();
     const messages = chatbox.querySelectorAll("div");
 
     messages.forEach(msg => {
         msg.style.display = msg.textContent.toLowerCase().includes(text)
-        ? "block" 
-        : "none";
+            ? "block" 
+            : "none";
     });
 });
+
+/* ---------------------------
+   HELPER: extract plain text safely
+   --------------------------- */
+function plainText(s) {
+    const d = document.createElement("div");
+    d.textContent = s;
+    return d.textContent;
+}
+
+/* ---------------------------
+   BOOTSTRAP
+   --------------------------- */
+(async function boot() {
+    await initialLoad();
+    startPolling();
+})();
 </script>
 
 </body>
