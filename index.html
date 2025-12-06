@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pro Chat App</title>
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+
+<style>
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: #0d0d0d;
+    color: white;
+}
+
+.chat-container {
+    width: 100%;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.chat-header {
+    background: #1a1a1a;
+    padding: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid #333;
+}
+
+.header-content {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 18px;
+}
+
+#set-name-btn {
+    background: #333;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 6px;
+    color: white;
+    cursor: pointer;
+    font-weight: normal;
+    transition: 0.3s;
+}
+
+.glow {
+    color: #fff;
+    font-weight: bold;
+    text-shadow: 0 0 5px #00f, 0 0 10px #0ff, 0 0 15px #0ff;
+    animation: glowAnimation 1.5s ease-in-out infinite alternate;
+}
+
+@keyframes glowAnimation {
+    from { text-shadow: 0 0 5px #00f, 0 0 10px #0ff, 0 0 15px #0ff; }
+    to { text-shadow: 0 0 10px #0ff, 0 0 20px #0ff, 0 0 25px #0ff; }
+}
+
+.chatbox {
+    flex: 1;
+    overflow-y: auto;
+    padding: 15px;
+    background: #0f0f0f;
+}
+
+.incoming {
+    background: #222;
+    padding: 10px;
+    margin: 8px 0;
+    border-radius: 6px;
+    width: fit-content;
+}
+
+.outgoing {
+    background: #0059ff;
+    padding: 10px;
+    color: white;
+    margin: 8px 0;
+    border-radius: 6px;
+    width: fit-content;
+    margin-left: auto;
+}
+
+.sender {
+    background: #1a1a1a;
+    padding: 10px;
+    display: flex;
+    border-top: 1px solid #333;
+}
+
+#maininput {
+    flex: 1;
+    background: #0d0d0d;
+    border: 1px solid #333;
+    padding: 10px;
+    color: white;
+    border-radius: 6px;
+}
+
+#mainsend {
+    background: #0059ff;
+    border: none;
+    padding: 10px 16px;
+    margin-left: 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    color: white;
+    transition: 0.3s;
+}
+
+#mainsend.typing-active {
+    box-shadow: 0 0 10px #00f, 0 0 20px #0ff;
+}
+</style>
+</head>
+<body>
+
+<div class="chat-container">
+    <header class="chat-header">
+        <div class="header-content">
+            <span class="material-icons">rocket_launch</span>
+            <span class="app-title">Cosmic Chat</span>
+        </div>
+
+        <button id="set-name-btn" onclick="setnames()" title="Change Name">
+            <span class="material-icons">person</span>
+        </button>
+    </header>
+
+    <div class="chatbox" id="chatbox"></div>
+
+    <div class="sender">
+        <form id="aa" target="dl"
+        action="https://script.google.com/macros/s/AKfycbxh1sI4XBNWcEi4y9kDyftiWoG9FOTg9bvWngFTOxYWKRI_xshd2H6jzzG3b-0IuRCu/exec"
+        method="post">
+
+            <input id="maininput" placeholder="Type a message..." name="textmess">
+            <input id="myinput" type="hidden" name="namm">
+
+            <button id="mainsend" type="submit">
+                <span class="material-icons">send</span>
+            </button>
+        </form>
+
+        <iframe name="dl" style="display:none;"></iframe>
+    </div>
+</div>
+
+<script>
+/* ===================== NAME HANDLING ===================== */
+let username = localStorage.getItem("usernamesA");
+
+function openNamePopup(callback) {
+    if (username) return; // never show again
+    let name = "";
+    while (true) {
+        name = prompt("Enter your chat name (Max 10 characters):");
+        if (name === null || name.trim() === "") { alert("Name cannot be empty."); continue; }
+        if (name.length > 10) { alert("Name must not be more than 10 characters."); continue; }
+        break;
+    }
+    username = name;
+    localStorage.setItem("usernamesA", username);
+    document.getElementById("myinput").value = username;
+    if (callback) callback();
+}
+
+function setnames() { openNamePopup(showUsername); }
+
+function showUsername() {
+    const btn = document.getElementById("set-name-btn");
+    btn.textContent = username;
+    btn.classList.add("glow");
+}
+
+// Show username if already exists
+if (username) {
+    document.getElementById("myinput").value = username;
+    showUsername();
+}
+
+/* ===================== CHAT INPUT & PERSISTENCE ===================== */
+const chatbox = document.getElementById("chatbox");
+const mainInput = document.getElementById("maininput");
+const sendButton = document.getElementById("mainsend");
+
+// Load messages from localStorage
+let chatMessages = JSON.parse(localStorage.getItem("chatMessages") || "[]");
+
+function renderMessages() {
+    chatbox.innerHTML = "";
+    chatMessages.forEach(msg => {
+        const div = document.createElement("div");
+        div.classList.add(msg.type);
+        div.innerHTML = msg.content;
+        chatbox.appendChild(div);
+    });
+    chatbox.scrollTop = chatbox.scrollHeight;
+}
+
+// Initial render
+renderMessages();
+
+let isAtBottom = true;
+chatbox.addEventListener("scroll", () => {
+    const threshold = 20; 
+    isAtBottom = chatbox.scrollHeight - chatbox.scrollTop - chatbox.clientHeight < threshold;
+});
+
+function toggleSendButton(text) {
+    if (text.trim().length > 0) sendButton.classList.add("typing-active");
+    else sendButton.classList.remove("typing-active");
+}
+
+/* Fetch new messages from server (optional) */
+let lastroww = 1;
+setInterval(() => {
+    fetch("https://script.google.com/macros/s/AKfycbxh1sI4XBNWcEi4y9kDyftiWoG9FOTg9bvWngFTOxYWKRI_xshd2H6jzzG3b-0IuRCu/exec?after=" + encodeURIComponent(lastroww))
+    .then(res => res.json())
+    .then(api => {
+        const data = api.data;
+        let updated = false;
+        for (let i = 0; i < data.length; i++) {
+            let U = data[i];
+            let N = U["Names"];
+            let T = U["Messages "];
+            if (!chatMessages.find(m => m.content === N + ": " + T)) {
+                chatMessages.push({type: "incoming", content: N + ": " + T});
+                updated = true;
+            }
+        }
+        lastroww = api.last;
+        if (updated) {
+            localStorage.setItem("chatMessages", JSON.stringify(chatMessages));
+            if (isAtBottom) renderMessages();
+        }
+    })
+    .catch(err => console.log(err));
+}, 5000);
+
+/* ===================== SEND MESSAGE HANDLER ===================== */
+document.getElementById("aa").addEventListener("submit", function(e) {
+    e.preventDefault();
+    if (!username) { openNamePopup(showUsername); return; }
+
+    const message = mainInput.value.trim();
+    if (!message) return;
+
+    const msgContent = username + ": " + message;
+    chatMessages.push({type: "outgoing", content: msgContent});
+    localStorage.setItem("chatMessages", JSON.stringify(chatMessages));
+
+    const div = document.createElement("div");
+    div.classList.add("outgoing");
+    div.innerHTML = msgContent;
+    chatbox.appendChild(div);
+
+    if (isAtBottom) chatbox.scrollTop = chatbox.scrollHeight;
+
+    this.submit();
+    mainInput.value = "";
+    toggleSendButton("");
+});
+
+// Open name popup if user clicks input
+mainInput.addEventListener("focus", () => { if (!username) openNamePopup(showUsername); });
+mainInput.addEventListener("input", e => toggleSendButton(e.target.value));
+</script>
+
+</body>
+</html>
