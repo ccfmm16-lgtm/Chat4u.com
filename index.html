@@ -27,6 +27,7 @@ body {
     height: 100vh;
     display: flex;
     flex-direction: column;
+    position: relative;
 }
 
 /* ===== USERNAME BADGE (neon glow) ===== */
@@ -42,7 +43,7 @@ body {
     border: 1px solid rgba(0, 255, 170, 0.5);
     box-shadow: 0 0 12px rgba(0, 255, 170, 0.7);
     backdrop-filter: blur(6px);
-    z-index: 999;
+    z-index: 1001;
 }
 
 /* ===== SEARCH BAR (neon glass) ===== */
@@ -60,6 +61,7 @@ body {
     font-size: 15px;
     backdrop-filter: blur(12px);
     animation: fadeSlide 0.6s ease-out;
+    z-index: 1000;
 }
 @keyframes fadeSlide {
     from { transform: translateY(-15px); opacity: 0; }
@@ -73,6 +75,7 @@ body {
     padding: 20px;
     margin-top: 120px;
     margin-bottom: 85px;
+    position: relative;
 }
 
 /* Scrollbar */
@@ -126,6 +129,7 @@ body {
     display: flex;
     border-top: 1px solid rgba(0, 255, 200, 0.3);
     backdrop-filter: blur(12px);
+    z-index: 1000;
 }
 
 /* MESSAGE INPUT */
@@ -151,12 +155,9 @@ body {
     font-weight: bold;
     box-shadow: 0 0 10px #00ffccaa;
 }
-
 #mainsend:hover {
     transform: scale(1.1);
 }
-
-/* Glow when typing */
 #mainsend.typing-active {
     animation: pulse 1s infinite alternate;
 }
@@ -165,6 +166,31 @@ body {
     to { box-shadow: 0 0 25px #00eaff; }
 }
 
+/* ===== LOADING OVERLAY ===== */
+#loadingOverlay {
+    position: fixed;
+    top:0;
+    left:0;
+    width:100%;
+    height:100%;
+    background: rgba(0,0,0,0.85);
+    color: #00ffaa;
+    font-size: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    flex-direction: column;
+    font-weight: bold;
+}
+#loadingOverlay span {
+    margin-top: 10px;
+    animation: blink 1s infinite alternate;
+}
+@keyframes blink {
+    from { opacity: 0.2; }
+    to { opacity: 1; }
+}
 </style>
 </head>
 <body>
@@ -172,26 +198,27 @@ body {
 <div class="chat-container">
 
     <div class="username-badge" id="usernameDisplay">Loading...</div>
-
     <input type="text" class="search-bar" placeholder="Search messages..." id="searchBar">
-
     <div class="chatbox" id="chatbox"></div>
 
     <div class="sender">
         <form id="aa" target="dl"
         action="https://script.google.com/macros/s/AKfycbxh1sI4XBNWcEi4y9kDyftiWoG9FOTg9bvWngFTOxYWKRI_xshd2H6jzzG3b-0IuRCu/exec"
         method="post">
-
             <input id="maininput" placeholder="Type a message..." name="textmess">
             <input id="myinput" type="hidden" name="namm">
-
             <button id="mainsend" type="submit">
                 <span class="material-icons">send</span>
             </button>
         </form>
-
         <iframe name="dl" style="display:none;"></iframe>
     </div>
+</div>
+
+<!-- LOADING OVERLAY -->
+<div id="loadingOverlay">
+    Loading chat...
+    <span class="material-icons">hourglass_top</span>
 </div>
 
 <script>
@@ -206,29 +233,33 @@ if(!username || !joinTime || nowTime - joinTime > 24*60*60*1000){
     username = null;
 }
 
-function askName() {
-    if (username) return;
+function askName(){
+    if(username) return;
     let name = "";
-    while (true) {
+    while(true){
         name = prompt("Enter your chat name (Max 10 characters):");
-        if (!name || name.trim() === "") { alert("Name cannot be empty"); continue; }
-        if (name.length > 10) { alert("Too long (max 10 chars)"); continue; }
+        if(!name || name.trim()===""){ alert("Name cannot be empty"); continue; }
+        if(name.length>10){ alert("Too long (max 10 chars)"); continue; }
         break;
     }
     username = name;
     localStorage.setItem("usernamesA", username);
     localStorage.setItem("joinTime", Date.now());
 }
+
 askName();
 document.getElementById("usernameDisplay").textContent = username;
 document.getElementById("myinput").value = username;
 
 const chatbox = document.getElementById("chatbox");
+const overlay = document.getElementById("loadingOverlay");
+
 let displayedMessageIds = new Set();
 let lastroww = 0;
+let firstFetchDone = false;
 
 /* ===== RENDER MESSAGE ===== */
-function renderMessage(msg, type){
+function renderMessage(msg,type){
     const div = document.createElement("div");
     div.classList.add(type);
     div.innerHTML = msg;
@@ -246,42 +277,49 @@ async function fetchMessages(){
 
         for(let U of data){
             const id = U["id"] || (U["Names"]+U["Messages "]);
-            const msgTime = new Date(U["timestamp"]||now).getTime(); // fallback if no timestamp
+            const msgTime = new Date(U["timestamp"]||now).getTime();
             if(!displayedMessageIds.has(id) && now - msgTime < 24*60*60*1000){
+                const msgType = (U["Names"] === username) ? "outgoing" : "incoming";
                 const msgContent = U["Names"] + ": " + U["Messages "];
-                renderMessage(msgContent, "incoming");
+                renderMessage(msgContent, msgType);
                 displayedMessageIds.add(id);
             }
         }
         lastroww = api.last || lastroww;
+
+        if(!firstFetchDone){
+            overlay.style.display = "none"; // hide loading after first fetch
+            firstFetchDone = true;
+        }
     }catch(err){
         console.error("Fetch error:", err);
+        if(!firstFetchDone) overlay.style.display = "none";
     }
 }
 
-/* Fetch every 1 second for fast updates */
-setInterval(fetchMessages, 1000);
+/* ===== FAST POLLING ===== */
+setInterval(fetchMessages,1000);
 
 /* ===== SEND MESSAGE ===== */
-document.getElementById("aa").addEventListener("submit", function(e){
+document.getElementById("aa").addEventListener("submit",function(e){
     e.preventDefault();
     const message = maininput.value.trim();
     if(!message) return;
-    const fullMsg = username + ": " + message;
-    renderMessage(fullMsg,"outgoing"); // optimistic display
+    const fullMsg = username+": "+message;
+    renderMessage(fullMsg,"outgoing"); // instant
     this.submit();
-    maininput.value = "";
+    maininput.value="";
     mainsend.classList.remove("typing-active");
 });
 
 /* ===== GLOW WHEN TYPING ===== */
-maininput.addEventListener("input", e=>{
+maininput.addEventListener("input",e=>{
     if(e.target.value.trim().length>0) mainsend.classList.add("typing-active");
     else mainsend.classList.remove("typing-active");
 });
 
 /* ===== SEARCH FILTER ===== */
-document.getElementById("searchBar").addEventListener("input", function(){
+document.getElementById("searchBar").addEventListener("input",function(){
     const text = this.value.toLowerCase();
     const messages = chatbox.querySelectorAll("div");
     messages.forEach(msg=>{
