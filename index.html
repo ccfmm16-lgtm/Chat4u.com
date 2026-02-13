@@ -3,330 +3,84 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Pro Chat App</title>
-<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-
+<title>Button Styles</title>
 <style>
-/* ===== GLOBAL THEME ===== */
-body {
-    margin: 0;
-    font-family: Arial, sans-serif;
-    background: linear-gradient(135deg, #050505, #0a0f20, #000000);
-    background-size: 300% 300%;
-    animation: bgShift 12s infinite alternate ease-in-out;
-    color: white;
-}
-@keyframes bgShift {
-    0% { background-position: 0% 50%; }
-    100% { background-position: 100% 50%; }
-}
-
-/* MAIN WRAPPER */
-.chat-container {
-    width: 100%;
-    height: 100vh;
-    display: flex;
-    flex-direction: column;
-    position: relative;
+/* Base style for all buttons */
+.make-download-btn {
+  text-decoration: none;
+  display: inline-block;
+  padding: 12px 25px;
+  font-size: 16px;
+  font-weight: bold;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  color: white;
 }
 
-/* ===== USERNAME BADGE (neon glow) ===== */
-.username-badge {
-    position: fixed;
-    top: 10px;
-    left: 50%;
-    transform: translateX(-50%);
-    padding: 10px 22px;
-    font-size: 16px;
-    border-radius: 20px;
-    background: rgba(0, 0, 0, 0.35);
-    border: 1px solid rgba(0, 255, 170, 0.5);
-    box-shadow: 0 0 12px rgba(0, 255, 170, 0.7);
-    backdrop-filter: blur(6px);
-    z-index: 1001;
+/* Style 1 - Classic Blue */
+.btn-blue {
+  background-color: #1E90FF;
+}
+.btn-blue:hover {
+  background-color: #187bcd;
+  transform: scale(1.05);
 }
 
-/* ===== SEARCH BAR (neon glass) ===== */
-.search-bar {
-    position: fixed;
-    top: 60px;
-    left: 12px;
-    right: 12px;
-    padding: 12px 15px;
-    border-radius: 14px;
-    background: rgba(255, 255, 255, 0.08);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    color: white;
-    outline: none;
-    font-size: 15px;
-    backdrop-filter: blur(12px);
-    animation: fadeSlide 0.6s ease-out;
-    z-index: 1000;
+/* Style 2 - Gradient Orange */
+.btn-gradient {
+  background: linear-gradient(45deg, #ff7e5f, #feb47b);
 }
-@keyframes fadeSlide {
-    from { transform: translateY(-15px); opacity: 0; }
-    to { transform: translateY(0); opacity: 1; }
+.btn-gradient:hover {
+  background: linear-gradient(45deg, #feb47b, #ff7e5f);
+  transform: scale(1.05);
 }
 
-/* CHAT AREA */
-.chatbox {
-    flex: 1;
-    overflow-y: auto;
-    padding: 20px;
-    margin-top: 120px;
-    margin-bottom: 85px;
-    position: relative;
+/* Style 3 - Outline */
+.btn-outline {
+  background-color: transparent;
+  color: #28a745;
+  border: 2px solid #28a745;
+}
+.btn-outline:hover {
+  background-color: #28a745;
+  color: white;
 }
 
-/* Scrollbar */
-.chatbox::-webkit-scrollbar {
-    width: 6px;
+/* Style 4 - Shadow Neon */
+.btn-neon {
+  background-color: #8e2de2;
+  box-shadow: 0 0 10px #8e2de2, 0 0 20px #4a00e0;
 }
-.chatbox::-webkit-scrollbar-thumb {
-    background: #00ffaa88;
-    border-radius: 50px;
-}
-
-/* ===== MESSAGE ANIMATION ===== */
-@keyframes msgPop {
-    0% { transform: translateY(10px) scale(0.95); opacity: 0; }
-    100% { transform: translateY(0) scale(1); opacity: 1; }
+.btn-neon:hover {
+  box-shadow: 0 0 20px #8e2de2, 0 0 30px #4a00e0;
+  transform: scale(1.05);
 }
 
-/* INCOMING MESSAGE */
-.incoming {
-    background: rgba(255, 255, 255, 0.1);
-    padding: 12px 14px;
-    margin: 10px 0;
-    border-radius: 10px;
-    width: fit-content;
-    box-shadow: 0 0 10px #ffffff22;
-    animation: msgPop 0.25s ease-out;
-    border-left: 3px solid #00ffaa;
+/* Style 5 - Rounded Pill */
+.btn-pill {
+  background-color: #ff4757;
+  border-radius: 50px;
 }
-
-/* OUTGOING MESSAGE */
-.outgoing {
-    background: linear-gradient(135deg, #006eff, #00eaff);
-    padding: 12px 14px;
-    color: black;
-    margin: 10px 0;
-    border-radius: 10px;
-    width: fit-content;
-    margin-left: auto;
-    box-shadow: 0 0 12px #00aaffaa;
-    animation: msgPop 0.25s ease-out;
-}
-
-/* SENDER BAR */
-.sender {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    background: rgba(5, 10, 20, 0.9);
-    padding: 12px;
-    display: flex;
-    border-top: 1px solid rgba(0, 255, 200, 0.3);
-    backdrop-filter: blur(12px);
-    z-index: 1000;
-}
-
-/* MESSAGE INPUT */
-#maininput {
-    flex: 1;
-    background: rgba(255, 255, 255, 0.08);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    padding: 12px;
-    border-radius: 10px;
-    color: white;
-}
-
-/* SEND BUTTON */
-#mainsend {
-    background: linear-gradient(135deg, #00ffaa, #00eaff);
-    border: none;
-    padding: 10px 16px;
-    margin-left: 10px;
-    border-radius: 10px;
-    cursor: pointer;
-    color: black;
-    transition: 0.3s ease;
-    font-weight: bold;
-    box-shadow: 0 0 10px #00ffccaa;
-}
-#mainsend:hover {
-    transform: scale(1.1);
-}
-#mainsend.typing-active {
-    animation: pulse 1s infinite alternate;
-}
-@keyframes pulse {
-    from { box-shadow: 0 0 10px #00ffaa; }
-    to { box-shadow: 0 0 25px #00eaff; }
-}
-
-/* ===== LOADING OVERLAY ===== */
-#loadingOverlay {
-    position: fixed;
-    top:0;
-    left:0;
-    width:100%;
-    height:100%;
-    background: rgba(0,0,0,0.85);
-    color: #00ffaa;
-    font-size: 20px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 2000;
-    flex-direction: column;
-    font-weight: bold;
-}
-#loadingOverlay span {
-    margin-top: 10px;
-    animation: blink 1s infinite alternate;
-}
-@keyframes blink {
-    from { opacity: 0.2; }
-    to { opacity: 1; }
+.btn-pill:hover {
+  background-color: #e84142;
+  transform: scale(1.05);
 }
 </style>
 </head>
 <body>
 
-<div class="chat-container">
+<h2>Choose Your Download Button Style:</h2>
 
-    <div class="username-badge" id="usernameDisplay">Loading...</div>
-    <input type="text" class="search-bar" placeholder="Search messages..." id="searchBar">
-    <div class="chatbox" id="chatbox"></div>
-
-    <div class="sender">
-        <form id="aa" target="dl"
-        action="https://script.google.com/macros/s/AKfycbxh1sI4XBNWcEi4y9kDyftiWoG9FOTg9bvWngFTOxYWKRI_xshd2H6jzzG3b-0IuRCu/exec"
-        method="post">
-            <input id="maininput" placeholder="Type a message..." name="textmess">
-            <input id="myinput" type="hidden" name="namm">
-            <button id="mainsend" type="submit">
-                <span class="material-icons">send</span>
-            </button>
-        </form>
-        <iframe name="dl" style="display:none;"></iframe>
-    </div>
-</div>
-
-<!-- LOADING OVERLAY -->
-<div id="loadingOverlay">
-    Loading chat...
-    <span class="material-icons">hourglass_top</span>
-</div>
-
-<script>
-/* ===== NAME HANDLING ===== */
-let username = localStorage.getItem("usernamesA");
-let joinTime = localStorage.getItem("joinTime");
-const nowTime = Date.now();
-
-if(!username || !joinTime || nowTime - joinTime > 24*60*60*1000){
-    localStorage.removeItem("usernamesA");
-    localStorage.removeItem("joinTime");
-    username = null;
-}
-
-function askName(){
-    if(username) return;
-    let name = "";
-    while(true){
-        name = prompt("Enter your chat name (Max 10 characters):");
-        if(!name || name.trim()===""){ alert("Name cannot be empty"); continue; }
-        if(name.length>10){ alert("Too long (max 10 chars)"); continue; }
-        break;
-    }
-    username = name;
-    localStorage.setItem("usernamesA", username);
-    localStorage.setItem("joinTime", Date.now());
-}
-
-askName();
-document.getElementById("usernameDisplay").textContent = username;
-document.getElementById("myinput").value = username;
-
-const chatbox = document.getElementById("chatbox");
-const overlay = document.getElementById("loadingOverlay");
-
-let displayedMessageIds = new Set();
-let lastroww = 0;
-let firstFetchDone = false;
-
-/* ===== RENDER MESSAGE ===== */
-function renderMessage(msg,type){
-    const div = document.createElement("div");
-    div.classList.add(type);
-    div.innerHTML = msg;
-    chatbox.appendChild(div);
-    chatbox.scrollTop = chatbox.scrollHeight;
-}
-
-/* ===== FETCH MESSAGES ===== */
-async function fetchMessages(){
-    try{
-        const res = await fetch("https://script.google.com/macros/s/AKfycbxh1sI4XBNWcEi4y9kDyftiWoG9FOTg9bvWngFTOxYWKRI_xshd2H6jzzG3b-0IuRCu/exec?after="+lastroww);
-        const api = await res.json();
-        const data = api.data;
-        const now = Date.now();
-
-        for(let U of data){
-            const id = U["id"] || (U["Names"]+U["Messages "]);
-            const msgTime = new Date(U["timestamp"]||now).getTime();
-            if(!displayedMessageIds.has(id) && now - msgTime < 24*60*60*1000){
-                const msgType = (U["Names"] === username) ? "outgoing" : "incoming";
-                const msgContent = U["Names"] + ": " + U["Messages "];
-                renderMessage(msgContent, msgType);
-                displayedMessageIds.add(id);
-            }
-        }
-        lastroww = api.last || lastroww;
-
-        if(!firstFetchDone){
-            overlay.style.display = "none"; // hide loading after first fetch
-            firstFetchDone = true;
-        }
-    }catch(err){
-        console.error("Fetch error:", err);
-        if(!firstFetchDone) overlay.style.display = "none";
-    }
-}
-
-/* ===== FAST POLLING ===== */
-setInterval(fetchMessages,1000);
-
-/* ===== SEND MESSAGE ===== */
-document.getElementById("aa").addEventListener("submit",function(e){
-    e.preventDefault();
-    const message = maininput.value.trim();
-    if(!message) return;
-    const fullMsg = username+": "+message;
-    renderMessage(fullMsg,"outgoing"); // instant
-    this.submit();
-    maininput.value="";
-    mainsend.classList.remove("typing-active");
-});
-
-/* ===== GLOW WHEN TYPING ===== */
-maininput.addEventListener("input",e=>{
-    if(e.target.value.trim().length>0) mainsend.classList.add("typing-active");
-    else mainsend.classList.remove("typing-active");
-});
-
-/* ===== SEARCH FILTER ===== */
-document.getElementById("searchBar").addEventListener("input",function(){
-    const text = this.value.toLowerCase();
-    const messages = chatbox.querySelectorAll("div");
-    messages.forEach(msg=>{
-        msg.style.display = msg.textContent.toLowerCase().includes(text)?"block":"none";
-    });
-});
-</script>
+<a href="https://otieu.com/4/10463339" target="_blank" class="make-download-btn btn-blue" id="noAdClick">⚡ MAKE DOWNLOAD</a>
+<br><br>
+<a href="https://otieu.com/4/10463339" target="_blank" class="make-download-btn btn-gradient">⚡ MAKE DOWNLOAD</a>
+<br><br>
+<a href="https://otieu.com/4/10463339" target="_blank" class="make-download-btn btn-outline">⚡ MAKE DOWNLOAD</a>
+<br><br>
+<a href="https://otieu.com/4/10463339" target="_blank" class="make-download-btn btn-neon">⚡ MAKE DOWNLOAD</a>
+<br><br>
+<a href="https://otieu.com/4/10463339" target="_blank" class="make-download-btn btn-pill">⚡ MAKE DOWNLOAD</a>
 
 </body>
 </html>
