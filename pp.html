@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Panel - Gallery Manager</title>
+<style>
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: #111;
+    color: white;
+}
+
+.container {
+    max-width: 600px;
+    margin: 50px auto;
+    background: #1c1c1c;
+    padding: 20px;
+    border-radius: 12px;
+}
+
+h1 {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+label {
+    display: block;
+    margin-top: 15px;
+    font-weight: bold;
+}
+
+input[type="number"], input[type="text"], input[type="file"] {
+    width: 100%;
+    padding: 10px;
+    margin-top: 5px;
+    border-radius: 6px;
+    border: none;
+    font-size: 16px;
+}
+
+button {
+    margin-top: 20px;
+    width: 100%;
+    padding: 12px;
+    background: #00ffcc;
+    border: none;
+    border-radius: 8px;
+    font-size: 18px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+#currentImages {
+    margin-top: 30px;
+}
+
+.image-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #000;
+    padding: 10px;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    word-break: break-all;
+}
+
+.delete-btn {
+    background: red;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 5px 10px;
+    cursor: pointer;
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Admin Panel</h1>
+
+    <!-- File Upload Only -->
+    <label for="imageFile">Select Image from your device:</label>
+    <input type="file" id="imageFile" accept="image/*">
+
+    <label for="adsCount">Number of Ads:</label>
+    <input type="number" id="adsCount" placeholder="Enter number of ads">
+
+    <label for="adsLink">Ads Redirect Link:</label>
+    <input type="text" id="adsLink" placeholder="Enter ads URL">
+
+    <button id="uploadBtn">Upload Image</button>
+
+    <div id="currentImages">
+        <h2>Current Images</h2>
+        <div id="imageList"></div>
+    </div>
+</div>
+
+<script>
+// Load existing galleryData from LocalStorage
+let galleryData = JSON.parse(localStorage.getItem('galleryData')) || [];
+
+// Display current images
+function displayImages() {
+    const list = document.getElementById('imageList');
+    list.innerHTML = '';
+    galleryData.forEach((item, index) => {
+        const div = document.createElement('div');
+        div.className = 'image-item';
+        div.innerHTML = `
+            <span>File: ${item.url.slice(0,50)}... | Ads: ${item.ads} | Ads Link: ${item.link}</span>
+            <button class="delete-btn" onclick="deleteImage(${index})">Delete</button>
+        `;
+        list.appendChild(div);
+    });
+}
+
+// Delete image
+function deleteImage(index) {
+    if (confirm("Are you sure you want to delete this image?")) {
+        galleryData.splice(index, 1);
+        localStorage.setItem('galleryData', JSON.stringify(galleryData));
+        displayImages();
+    }
+}
+
+// Upload image from device
+document.getElementById('uploadBtn').onclick = function() {
+    const fileInput = document.getElementById('imageFile').files[0];
+    const ads = parseInt(document.getElementById('adsCount').value);
+    const adsLink = document.getElementById('adsLink').value.trim();
+
+    if (!fileInput) {
+        alert("Please select an image from your device.");
+        return;
+    }
+    if (!ads || !adsLink) {
+        alert("Please enter Ads number and Ads link.");
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const base64Image = e.target.result;
+        galleryData.push({
+            url: base64Image,
+            ads: ads,
+            originalAds: ads,
+            link: adsLink
+        });
+        localStorage.setItem('galleryData', JSON.stringify(galleryData));
+
+        // Clear inputs
+        document.getElementById('imageFile').value = '';
+        document.getElementById('adsCount').value = '';
+        document.getElementById('adsLink').value = '';
+
+        displayImages();
+        alert("Image uploaded successfully!");
+    };
+    reader.readAsDataURL(fileInput);
+}
+
+// Initial display
+displayImages();
+</script>
+
+</body>
+</html>
